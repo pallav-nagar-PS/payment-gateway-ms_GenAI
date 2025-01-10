@@ -1,0 +1,61 @@
+services:
+  paymentgateway-service:
+    build: .
+    ports:
+      - "8081:8081"
+    depends_on:
+      - kafka
+      - redis
+      - postgres
+      - sonarqube
+#      - owasp-zap
+      - jenkins
+      - jmeter
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    ports:
+      - "9092:9092"
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: sonar
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+  sonarqube:
+    image: sonarqube:latest
+    environment:
+      SONARQUBE_JDBC_URL: jdbc:postgresql://postgres:5432/sonar
+    ports:
+      - "9000:9000"
+    depends_on:
+      - postgres
+#  owasp-zap:
+#    image: owasp/zap2docker-stable:latest
+#    command: zap.sh -daemon -port 8090 -host 0.0.0.0 -config api.disablekey=true
+#    ports:
+#      - "8090:8090"
+  jmeter:
+    image: justb4/jmeter:latest
+    volumes:
+      - ./jmeter:/jmeter
+    entrypoint: /bin/bash
+  jenkins:
+    image: jenkins/jenkins:lts
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins-data:/var/jenkins_home
+volumes:
+  jenkins-data:
+  postgres-data:
+
+networks:
+  default:
+    driver: bridge

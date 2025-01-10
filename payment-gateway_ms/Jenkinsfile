@@ -1,0 +1,131 @@
+pipeline {
+    agent any
+
+    environment {
+        // Define environment variables
+        DOCKER_IMAGE = 'payment-gateway-service:latest'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Check out the source code from version control
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                // Build the application using Maven
+                script {
+                    sh 'mvn clean package'
+                }
+            }
+        }
+
+        stage('Unit Tests') {
+            steps {
+                // Run unit tests and generate reports
+                script {
+                    sh 'mvn test'
+                }
+            }
+            post {
+                always {
+                    // Archive the test results
+                    junit '**/target/surefire-reports/TEST-*.xml'
+                }
+            }
+        }
+
+        stage('Code Quality Analysis') {
+            steps {
+                // Analyze code quality using SonarQube
+                script {
+                    withSonarQubeEnv('My SonarQube Server') {
+                        sh 'mvn clean verify sonar:sonar'
+                    }
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                // Perform security scanning using OWASP Dependency Check
+                script {
+                    sh 'mvn org.owasp:dependency-check-maven:check'
+                }
+            }
+            post {
+                always {
+                    // Archive the security report
+                    dependencyCheckPublisher pattern: '**/dependency-check-report.html'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                // Build Docker image
+                script {
+                    sh "docker build -t ${env.DOCKER_IMAGE} ."
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                // Push the Docker image to a registry
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-credentials-id') {
+                        sh "docker push ${env.DOCKER_image}"
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                // Deploy to the staging environment
+                script {
+                    sh 'kubectl apply -f k8s/staging/deployment.yml'
+                    sh 'kubectl rollout status deployment/payment-gateway-service'
+                }
+            }
+        }
+
+        stage('Integration Tests') {
+            steps {
+                // Run integration tests against the staging environment
+                script {
+                    sh 'mvn verify -Pintegration-tests'
+                }
+            }
+        }
+
+        stage('Production Deployment Approval') {
+            steps {
+                // Manual approval before production deployment
+                input 'Deploy to Production?'
+            }
+        }
+
+        stage('Deploy to Production') {
+            steps {
+                // Deploy to the production environment
+                script {
+                    sh 'kubectl apply -f k8s/production/deployment.yml'
+                    sh 'kubectl rollout status deployment/payment-gateway-service'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Clean up workspace
+            cleanWs()
+        }
+    }
+}
+

@@ -1,0 +1,95 @@
+server:
+  port: 8081
+spring:
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health, info, metrics, loggers, prometheus
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: payment-gateway
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: dev-db
+    password: devAdmin
+  h2:
+    console:
+      enabled: true
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+    hibernate:
+      ddl-auto: update
+    generate-ddl: false
+    show-sql: true
+    defer-datasource-initialization: true
+  cache:
+    type: redis
+    redis:
+      host: localhost
+      port: 6379
+  resilience4j.retry:
+    instances:
+      backendA:
+        maxRetryAttempts: 3
+        waitDuration: 1000
+  resilience4j.circuitbreaker:
+    instances:
+      paymentGatewayService:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10000
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+  mvc:
+    pathmatch:
+      matching-strategy: ANT_PATH_MATCHER
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: https://example.com/.well-known/jwks.json
+currency:
+  api:
+    baseurl: "http://api.exchangeratesapi.io"
+    key: "YOUR_API_KEY"
+logging:
+  level:
+    org:
+      springframework:
+        data: DEBUG
+      hibernate:
+        SQL: DEBUG
+        type:
+          descriptor:
+            sql: trace
+sonar:
+  projectKey: paymentgateway-service
+  projectName: Payment Gateway Microservice
+  projectVersion: 1.0
+  sources: src/main/java
+  tests: src/test/java
+  java:
+    binaries: target/classes
+  language: java
+  sourceEncoding: UTF-8
+springdoc:
+  api-docs:
+    enabled: true
+scrape_configs:
+  job_name: 'spring-boot-app'
+  metrics_path: '/actuator/prometheus'
+  static_configs:
+    targets: ['localhost:8081']
